@@ -68,20 +68,7 @@ const submit = () => {
                 <InputError class="mt-2" :message="form.errors.password" />
             </div>
 
-            <div class="mt-4">
-                <InputLabel for="phone" value="Phone" />
-
-                <TextInput
-                    id="phone"
-                    type="phone"
-                    class="mt-1 block w-full"
-                    v-model="form.phone"
-                    required
-                    autocomplete="phone"
-                />
-
-                <InputError class="mt-2" :message="form.errors.phone" />
-            </div>
+            
 
             <div class="mt-4 block">
                 <label class="flex items-center">

@@ -10,14 +10,19 @@ Route::get('/', function () {
     return Inertia::render('Home');
 });
 
-Route::get('/profilee', function () {
-    return Inertia::render('Profilee');
-})->middleware(['auth'])->name('profile.show'); // Добавляем middleware 'auth' и имя маршрута
+Route::middleware(['auth'])->group(function () { // Группируем защищенные маршруты
+    Route::get('/profilee', function () {
+        return Inertia::render('Profilee');
+    })->name('profile.show');
 
-// Маршрут для обновления профиля
-Route::patch('/profile', [ProfileController::class, 'update'])
-    ->middleware(['auth'])
-    ->name('profile.update');
+    // Маршрут для обновления общих данных профиля
+    Route::patch('/profile', [ProfileController::class, 'update'])
+        ->name('profile.update');
+
+    // НОВЫЙ МАРШРУТ: для обновления пароля
+    Route::patch('/profile/password', [ProfileController::class, 'updatePassword'])
+        ->name('profile.password.update');
+});
 
 Route::get('/search', [ListingController::class, 'index'])->name('listings.index');
 Route::resource('listings', ListingController::class);
