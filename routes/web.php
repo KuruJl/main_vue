@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ListingController;
+use App\Http\Controllers\BookingController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -23,7 +24,7 @@ Route::middleware(['auth'])->group(function () { // Группируем защ�
     Route::patch('/profile/password', [ProfileController::class, 'updatePassword'])
         ->name('profile.password.update');
 });
-
+Route::post('/bookings', [BookingController::class, 'store']);
 Route::get('/search', [ListingController::class, 'index'])->name('listings.index');
 Route::resource('listings', ListingController::class);
 

@@ -3,17 +3,72 @@
 namespace App\Http\Controllers;
 
 use App\Models\Listing;
- use Illuminate\Http\Request;
+use App\Models\Booking;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Illuminate\Support\Facades\Storage; // <-- ДОБАВЬТЕ ЭТУ СТРОКУ!
+use Illuminate\Support\Facades\Storage;
 
 class ListingController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $listings = Listing::with('images')->get();
+        // 1. Получаем все уникальные города для фильтра (из всех объявлений)
+        $cities = Listing::select('city')
+                         ->distinct()
+                         ->orderBy('city')
+                         ->pluck('city')
+                         ->toArray();
+
+        // 2. Получаем минимальную и максимальную цену / количество комнат для фильтра
+        $minPrice = Listing::min('price_per_night');
+        $maxPrice = Listing::max('price_per_night');
+        $minRooms = Listing::min('count_rooms');
+        $maxRooms = Listing::max('count_rooms');
+
+        // Начинаем запрос к объявлениям, включая изображения
+        $query = Listing::with('images');
+
+        // Применяем фильтры из запроса
+        // Фильтр по городу
+        if ($request->has('city') && $request->input('city') !== null && $request->input('city') !== '') {
+            $query->where('city', $request->input('city'));
+        }
+
+        // Фильтр по количеству комнат
+        if ($request->has('count_rooms') && $request->input('count_rooms') !== null) {
+            $query->where('count_rooms', (int) $request->input('count_rooms'));
+        }
+
+        // Фильтр по диапазону цен
+        if ($request->has('min_price') && $request->input('min_price') !== null) {
+            $query->where('price_per_night', '>=', (float) $request->input('min_price'));
+        }
+        if ($request->has('max_price') && $request->input('max_price') !== null) {
+            $query->where('price_per_night', '<=', (float) $request->input('max_price'));
+        }
+
+        // Фильтр по дате (например, по дате создания объявления)
+        // Для более сложной фильтрации по доступности дат потребуется отдельная логика с таблицей бронирований
+        if ($request->has('date_from') && $request->input('date_from') !== null) {
+            $query->whereDate('created_at', '>=', $request->input('date_from'));
+        }
+        if ($request->has('date_to') && $request->input('date_to') !== null) {
+            $query->whereDate('created_at', '<=', $request->input('date_to'));
+        }
+
+        // Получаем отфильтрованные объявления
+        $listings = $query->get();
+
         return Inertia::render('Search', [
             'listings' => $listings,
+            'filters' => $request->all(), // Передаем текущие примененные фильтры обратно во фронтенд
+            'filterOptions' => [ // Опции для выпадающих списков/диапазонов
+                'cities' => $cities,
+                'minPriceOverall' => $minPrice,
+                'maxPriceOverall' => $maxPrice,
+                'minRoomsOverall' => $minRooms,
+                'maxRoomsOverall' => $maxRooms,
+            ]
         ]);
     }
 
@@ -21,64 +76,62 @@ class ListingController extends Controller
     {
         $listing = Listing::with('images')->find($id);
         if (!$listing) {
-            abort(404); // Или перенаправление, или другое действие
+            abort(404);
         }
+
+        $bookedDates = Booking::where('listing_id', $listing->id)
+                               ->whereIn('status', ['pending', 'confirmed'])
+                               // ИСПОЛЬЗУЕМ ВАШИ НАЗВАНИЯ ПОЛЕЙ: start_date, end_date
+                               ->get(['start_date', 'end_date']); // <--- ИЗМЕНЕНО
+
+        $unavailableDates = [];
+        foreach ($bookedDates as $booking) {
+            $unavailableDates[] = [
+                'start' => $booking->start_date, // <--- ИЗМЕНЕНО
+                'end' => $booking->end_date,     // <--- ИЗМЕНЕНО
+            ];
+        }
+
         return Inertia::render('Room', [
             'listing' => $listing,
+            'unavailableDates' => $unavailableDates,
         ]);
     }
 
+
     public function store(Request $request)
     {
-        // ПРОВЕРКА АУТЕНТИФИКАЦИИ И БЕЗОПАСНОСТИ:
-        // Убедимся, что пользователь авторизован, и берем его ID.
-        // Это предотвращает подмену user_id через клиентский запрос.
         if (!auth()->check()) {
-            // Если пользователь не авторизован, можно вернуть ошибку
-            // или перенаправить на страницу входа.
             return back()->withErrors(['auth' => 'Для создания объявления необходимо войти в систему.']);
-            // Или: return redirect()->route('login');
         }
 
-        // Проверка user_id, чтобы убедиться, что он совпадает с аутентифицированным пользователем
-        // Это хорошая практика безопасности
         $request->merge(['user_id' => auth()->id()]);
 
-
         $validatedData = $request->validate([
-            'user_id' => 'required|exists:users,id', // Убеждаемся, что user_id валиден
+            'user_id' => 'required|exists:users,id',
             'title' => 'required|string|max:255',
             'description' => 'required|string',
             'price_per_night' => 'required|numeric|min:1',
             'address' => 'required|string',
             'city' => 'required|string',
             'count_rooms' => 'required|integer|min:1',
-            'images' => 'array|max:5', // Максимум 5 файлов
-            'images.*' => 'image|mimes:jpeg,png,jpg,gif,svg|max:2048', // Валидация для каждого файла
+            'images' => 'array|max:5',
+            'images.*' => 'image|mimes:jpeg,png,jpg,gif,svg|max:2048',
         ]);
 
-        // Создаем объявление
         $listing = Listing::create($validatedData);
 
-        // Обработка изображений
         if ($request->hasFile('images')) {
             foreach ($request->file('images') as $image) {
-                // Сохраняем изображение в публичное хранилище (storage/app/public/listings)
                 $path = Storage::disk('public')->put('listings', $image);
-
-                // Создаем запись в таблице listing_images
                 $listing->images()->create([
-                    'url' => Storage::url($path), // Генерируем публичный URL для изображения
-                    'is_cover' => false // По умолчанию не обложка, можешь добавить логику для выбора обложки
+                    'url' => Storage::url($path),
+                    'is_cover' => false
                 ]);
             }
         }
 
-        // После успешного создания и обработки, перенаправляем пользователя
-        // на страницу созданного объявления. Inertia.js автоматически обрабатывает редиректы.
-        // Используем session()->flash для передачи сообщения об успехе.
         session()->flash('success', 'Объявление успешно создано!');
-
         return redirect()->route('listings.show', $listing->id);
     }
 

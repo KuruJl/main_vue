@@ -1,32 +1,26 @@
 <template>
-  <div>
-    <AppHeader />
-    <AppRoom1 :listing="listing" />
-    <AppFooter />
+  <div class="room-page">
+      <AppHeader />
+      <AppRoom1 :listing="listing" :unavailableDates="unavailableDates" />
+      <AppFooter />
   </div>
 </template>
 
-<script>
-import AppRoom1 from '../Pages/Room1.vue'; // Убедись, что путь правильный
- import AppHeader from '../Pages/Header.vue'; // Раскомментируй, если используешь
- import AppFooter from '../Pages/Footer.vue'; // Раскомментируй, если используешь
+<script setup>
+import AppHeader from './Header.vue';
+import AppFooter from './Footer.vue';
+import AppRoom1 from './Room1.vue';
 
-export default {
-  components: {
-    AppHeader,
-    AppRoom1,
-    AppFooter,
-    // Header,
-    // Footer,
-  },
-  props: {
-    listing: {
-      type: Object,
-      required: true // Оставляем true, чтобы Vue предупредил, если пропс не придет
-    }
-  },
-  name: 'Room',
-  // Добавляем хук mounted для отладки
-  
-}
+const props = defineProps({
+    listing: Object,
+    unavailableDates: Array,
+    // Добавьте пропсы для flash сообщений
+    success: String, // 'success' от redirect()->with('success', ...)
+    errors: Object,  // 'errors' от redirect()->withErrors(...)
+});
+
+// Передаем flash сообщения в AppRoom1
+const successMessage = props.success || null;
+const errorMessage = props.errors.message || null; // Если у вас есть errors.message
+
 </script>
