@@ -53,14 +53,7 @@ class BookingController extends Controller
         $startDate = Carbon::parse($validated['start_date']);
         $endDate = Carbon::parse($validated['end_date']);
 
-        // Логика проверки пересечений:
-        // Проверяем, есть ли существующие бронирования для этого объявления
-        // со статусом 'pending' или 'confirmed', которые пересекаются с запрошенным периодом.
-        // Занятые даты могут быть:
-        //  - новое бронирование начинается внутри существующего (start_date находится между)
-        //  - новое бронирование заканчивается внутри существующего (end_date находится между)
-        //  - новое бронирование полностью охватывает существующее (start_date <= existing_start_date И end_date >= existing_end_date)
-        //  - существующее бронирование полностью охватывает новое (existing_start_date <= start_date И existing_end_date >= end_date)
+        
         $conflictingBookings = Booking::where('listing_id', $validated['listing_id'])
             ->whereIn('status', ['pending', 'confirmed'])
             ->where(function ($query) use ($startDate, $endDate) {
@@ -99,8 +92,8 @@ class BookingController extends Controller
 
         // 4. Возвращаем успешное перенаправление с flash-сообщением
         // 'success' будет доступен во Vue-компоненте через props.success
-        return redirect()->back()->with('success', 'Бронирование успешно создано! Ожидайте подтверждения.');
-
+        return redirect()->route('listings.show', ['listing' => $validated['listing_id']])
+        ->with('success', 'Бронирование успешно создано! Ожидайте подтверждения.'); 
         // Альтернативно, если вы хотите перенаправить на конкретную страницу (например, страницу бронирований пользователя):
         // return redirect()->route('user.bookings.index')->with('success', 'Бронирование успешно создано!');
     }

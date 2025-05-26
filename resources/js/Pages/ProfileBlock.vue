@@ -81,33 +81,71 @@
                   <button @click="cancelEdit" class="cancel-button">Отменить</button>
               </template>
           </div>
-      </div>
+
+          <h2 class="profile-subtitle mt-8">Мои Бронирования</h2>
+          <div class="bookings-list">
+              <p v-if="bookings.length === 0" class="no-bookings-message">У вас пока нет активных бронирований.</p>
+              <div v-for="booking in bookings" :key="booking.id" class="booking-item">
+                  <div class="booking-header">
+                      <h3>{{ booking.listing ? booking.listing.title : 'Объявление удалено' }}</h3>
+                      <span :class="['booking-status', `status-${booking.status}`]">
+                          {{ getStatusText(booking.status) }}
+                      </span>
+                  </div>
+                  <p><strong>Даты:</strong> {{ formatDate(booking.start_date) }} - {{ formatDate(booking.end_date) }}</p>
+                  <p><strong>Ночей:</strong> {{ booking.number_of_nights || 'Не указано' }}</p>
+                  <p><strong>Итого к оплате:</strong> {{ booking.total_price }} ₽</p>
+                  <p><strong>Дата бронирования:</strong> {{ formatDate(booking.created_at) }}</p>
+              </div>
+          </div>
+          </div>
   </div>
 </template>
 
 <script setup>
 import { usePage, useForm } from '@inertiajs/vue3';
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, onMounted } from 'vue';
+
+// Определяем пропсы, которые компонент будет принимать
+const props = defineProps({
+  // user: Object, // Эту строку закомментируем/удалим, если user берется из page.props.auth.user
+  bookings: {
+      type: Array,
+      default: () => []
+  },
+  success: String,
+  error: String,
+  mustVerifyEmail: Boolean,
+  status: String,
+});
 
 const page = usePage();
-const user = computed(() => page.props.auth.user);
+// *** ВОТ ЭТА СТРОКА ОПРЕДЕЛЯЕТ, КАК ПОЛУЧАЮТСЯ ДАННЫЕ ПОЛЬЗОВАТЕЛЯ ***
+// Если ваш контроллер передает пользователя через page.props.auth.user (стандарт Breeze/Jetstream),
+// то используем ее.
+const user = computed(() => page.props.auth.user); 
+// Если ваш контроллер передает пользователя как отдельный пропс 'user', 
+// раскомментируйте 'user: Object' в defineProps и используйте:
+// const user = computed(() => props.user); 
+// Но для стандартной Inertia/Laravel Breeze настройки, первый вариант (page.props.auth.user) предпочтительнее.
 
 const editMode = ref(false);
 
-// Форма для редактирования общих данных
+// Инициализируем форму с данными пользователя
 const form = useForm({
   name: user.value ? user.value.name : '',
   email: user.value ? user.value.email : '',
   phone: user.value ? user.value.phone || '' : '',
 });
 
-// Отдельная форма для изменения пароля
+// Форма для изменения пароля
 const passwordForm = useForm({
   current_password: '',
   password: '',
   password_confirmation: '',
 });
 
+// Отслеживаем изменения в объекте user и обновляем форму
 watch(user, (newUser) => {
   if (newUser) {
       form.name = newUser.name;
@@ -116,20 +154,33 @@ watch(user, (newUser) => {
   }
 }, { immediate: true });
 
+// Хук жизненного цикла, выполняется после монтирования компонента
+onMounted(() => {
+  console.log('Profile component mounted. Bookings:', props.bookings);
+  // Отображение flash-сообщений, если они есть
+  if (props.success) {
+      alert(props.success);
+  }
+  if (props.error) {
+      alert(props.error);
+  }
+});
+
+
 const enterEditMode = () => {
   editMode.value = true;
+  // Обновляем форму данными пользователя при входе в режим редактирования
   form.name = user.value.name;
   form.email = user.value.email;
   form.phone = user.value.phone || '';
-  passwordForm.reset(); // Сбрасываем поля пароля при входе в режим редактирования
-  passwordForm.clearErrors(); // Очищаем ошибки формы пароля
+  passwordForm.reset();
+  passwordForm.clearErrors();
 };
 
 const saveChanges = () => {
   form.patch('/profile', {
       onSuccess: () => {
-          editMode.value = false; // Выходим из режима редактирования общих данных
-          alert('Данные профиля успешно обновлены!'); // Временное оповещение
+          editMode.value = false;
       },
       onError: () => {
           console.error('Ошибка при сохранении профиля:', form.errors);
@@ -141,50 +192,65 @@ const cancelEdit = () => {
   editMode.value = false;
   form.reset();
   form.clearErrors();
-  passwordForm.reset(); // Сбрасываем поля пароля при отмене
-  passwordForm.clearErrors(); // Очищаем ошибки формы пароля
+  passwordForm.reset();
+  passwordForm.clearErrors();
 };
 
-// Метод для обновления пароля (отдельный)
 const updatePassword = () => {
   passwordForm.patch('/profile/password', {
       onSuccess: () => {
-          passwordForm.reset(); // Очищаем поля пароля после успешного изменения
-          alert('Пароль успешно изменен!'); // Временное оповещение
+          passwordForm.reset();
       },
       onError: (errors) => {
           console.error('Ошибка при изменении пароля:', errors);
       },
       onFinish: () => {
-          passwordForm.reset('current_password'); // Сбросить только текущий пароль на всякий случай
+          passwordForm.reset('current_password');
       }
   });
+};
+
+// Вспомогательная функция для форматирования даты
+const formatDate = (dateString) => {
+  if (!dateString) return 'Не указано';
+  const options = { year: 'numeric', month: 'long', day: 'numeric' };
+  return new Date(dateString).toLocaleDateString('ru-RU', options);
+};
+
+// Вспомогательная функция для отображения статуса на русском
+const getStatusText = (status) => {
+  switch (status) {
+      case 'pending':
+          return 'В ожидании';
+      case 'confirmed':
+          return 'Подтверждено';
+      case 'declined':
+          return 'Отклонено';
+      case 'cancelled':
+          return 'Отменено';
+      default:
+          return status;
+  }
 };
 </script>
 
 <style scoped>
 /* Ваши существующие стили */
-
-/* Дополнительные стили для отступов и заголовка */
 .profile-minor-subtitle {
-  font-size: 24px; /* Чуть меньше основного заголовка */
+  font-size: 24px;
   font-weight: 600;
   margin: 0 0 15px 0;
   color: #000000;
 }
-
 .mt-6 {
-  margin-top: 1.5rem; /* Отступ сверху для заголовка пароля */
+  margin-top: 1.5rem;
 }
-
-/* Стили для кнопки "Изменить пароль", чтобы отличалась, если нужно */
 .password-save-button {
-  background-color: #007bff; /* Пример другого цвета */
+  background-color: #007bff;
 }
 .password-save-button:hover {
   background-color: #0056b3;
 }
-/* Остальные стили из вашего кода (убедитесь, что они применены) */
 .edit-input {
   flex-grow: 1;
   padding: 8px 12px;
@@ -291,5 +357,74 @@ const updatePassword = () => {
 }
 .edit-button:hover {
   background-color: #ACE000;
+}
+
+/* НОВЫЕ СТИЛИ ДЛЯ БЛОКА БРОНИРОВАНИЙ */
+.mt-8 {
+  margin-top: 2rem;
+}
+.bookings-list {
+  display: grid;
+  gap: 20px;
+  margin-top: 20px;
+}
+.booking-item {
+  background-color: #f9f9f9;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease;
+}
+.booking-item:hover {
+  transform: translateY(-3px);
+}
+.booking-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.booking-header h3 {
+  font-size: 1.5em;
+  color: #333;
+  margin: 0;
+  font-weight: 600;
+}
+.booking-item p {
+  margin: 5px 0;
+  color: #555;
+  font-size: 0.95em;
+}
+.booking-item strong {
+  color: #000;
+}
+.booking-status {
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: 0.85em;
+  font-weight: bold;
+  color: white;
+}
+.status-pending {
+  background-color: #ffc107;
+}
+.status-confirmed {
+  background-color: #28a745;
+}
+.status-declined {
+  background-color: #dc3545;
+}
+.status-cancelled {
+  background-color: #6c757d;
+}
+.no-bookings-message {
+  text-align: center;
+  color: #777;
+  font-style: italic;
+  padding: 20px;
+  border: 1px dashed #e0e0e0;
+  border-radius: 8px;
+  background-color: #fafafa;
 }
 </style>

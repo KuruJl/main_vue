@@ -1,4 +1,5 @@
 <?php
+// app/Http/Controllers/ProfileController.php
 
 namespace App\Http\Controllers;
 
@@ -10,8 +11,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
 use Inertia\Inertia;
 use Inertia\Response;
-use App\Http\Requests\UpdatePasswordRequest; // <--- ДОБАВЬТЕ ЭТО
-use Illuminate\Support\Facades\Hash; // <--- ДОБАВЬТЕ ЭТО для Hash::check()
+use App\Models\User; // Убедитесь, что User импортирован
+use App\Models\Booking; // Убедитесь, что Booking импортирован
 
 class ProfileController extends Controller
 {
@@ -20,9 +21,23 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): Response
     {
+        // Получаем текущего аутентифицированного пользователя
+        $user = $request->user();
+
+        // Загружаем бронирования текущего пользователя с информацией об объявлении (listing)
+        // Если у пользователя есть отношение 'bookings' в модели User:
+        $bookings = $user->bookings()->with('listing')->latest()->get(); // 'listing' - это отношение в модели Booking
+        // Если у вас нет отношения bookings в User, то можно так:
+        // $bookings = Booking::where('user_id', $user->id)->with('listing')->latest()->get();
+
+
         return Inertia::render('Profile/Edit', [
-            'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
+            'user' => $user->toArray(), // Передаем данные пользователя
+            'bookings' => $bookings->toArray(), // Передаем бронирования пользователя
+            'mustVerifyEmail' => $user instanceof MustVerifyEmail && ! $user->hasVerifiedEmail(),
             'status' => session('status'),
+            'success' => session('success'), // Для flash-сообщений, если они используются
+            'error' => session('error'),     // Для flash-сообщений
         ]);
     }
 
@@ -37,30 +52,28 @@ class ProfileController extends Controller
             $request->user()->email_verified_at = null;
         }
 
-        // Если вы добавили поле 'phone' в базу данных, добавьте его здесь
-        // Пример: $request->user()->phone = $request->input('phone');
-        // Пожалуйста, добавьте это, если phone есть в форме
-        if ($request->has('phone')) {
-            $request->user()->phone = $request->input('phone');
-        }
-
-
         $request->user()->save();
 
-        // ИЗМЕНИТЕ ЭТУ СТРОКУ:
-        return Redirect::back()->with('success', 'Профиль успешно обновлен!'); // <--- Редирект назад с сообщением об успехе
+        return Redirect::route('profile.edit')->with('success', 'Данные профиля успешно обновлены.');
     }
-    public function updatePassword(UpdatePasswordRequest $request): RedirectResponse
+
+    /**
+     * Update the user's password.
+     */
+    public function updatePassword(Request $request): RedirectResponse
     {
-        // $request->validated() уже содержит current_password, password, password_confirmation
-        // и current_password уже проверен правилом 'current_password'
+        $request->validate([
+            'current_password' => ['required', 'current_password'],
+            'password' => ['required', 'confirmed', 'min:8'],
+        ]);
 
-        $request->user()->forceFill([
-            'password' => Hash::make($request->password),
-        ])->save(); // Используем forceFill, чтобы обойти $fillable для пароля, если не добавлен
+        $request->user()->update([
+            'password' => bcrypt($request->password),
+        ]);
 
-        return Redirect::back()->with('success', 'Пароль успешно изменен!');
+        return Redirect::route('profile.edit')->with('success', 'Пароль успешно обновлен.');
     }
+
     /**
      * Delete the user's account.
      */
