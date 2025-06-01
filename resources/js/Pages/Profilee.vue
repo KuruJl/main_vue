@@ -9,7 +9,7 @@
   <script setup>
   import AppHeader from './Header.vue';
   import AppFooter from './Footer.vue';
-  import AppProfile from './ProfileBlock.vue';
+  import AppProfile from './Profile/Partials/ProfileBlock.vue';
   </script>
   
   <script >

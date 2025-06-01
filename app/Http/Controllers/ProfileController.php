@@ -1,18 +1,15 @@
 <?php
-// app/Http/Controllers/ProfileController.php
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\ProfileUpdateRequest;
-use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Illuminate\Http\RedirectResponse;
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
 use Inertia\Inertia;
 use Inertia\Response;
-use App\Models\User; // Убедитесь, что User импортирован
-use App\Models\Booking; // Убедитесь, что Booking импортирован
+use App\Models\Booking; // Убедитесь, что эта строка есть
 
 class ProfileController extends Controller
 {
@@ -21,40 +18,44 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): Response
     {
-        // Получаем текущего аутентифицированного пользователя
         $user = $request->user();
 
-        // Загружаем бронирования текущего пользователя с информацией об объявлении (listing)
-        // Если у пользователя есть отношение 'bookings' в модели User:
-        $bookings = $user->bookings()->with('listing')->latest()->get(); // 'listing' - это отношение в модели Booking
-        // Если у вас нет отношения bookings в User, то можно так:
-        // $bookings = Booking::where('user_id', $user->id)->with('listing')->latest()->get();
-
-
+        // Проверьте, что этот запрос возвращает данные.
+        // Вы можете временно добавить dd($bookings->toArray()); ПЕРЕД return Inertia::render
+        // чтобы убедиться, что здесь они есть.
+        $bookings = $user->bookings()->with('listing')->latest()->get();
         return Inertia::render('Profile/Edit', [
-            'user' => $user->toArray(), // Передаем данные пользователя
-            'bookings' => $bookings->toArray(), // Передаем бронирования пользователя
-            'mustVerifyEmail' => $user instanceof MustVerifyEmail && ! $user->hasVerifiedEmail(),
+            'mustVerifyEmail' => $user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && ! $user->hasVerifiedEmail(),
             'status' => session('status'),
-            'success' => session('success'), // Для flash-сообщений, если они используются
-            'error' => session('error'),     // Для flash-сообщений
+            // ОЧЕНЬ ВАЖНО: имя ключа 'bookings' должно точно совпадать
+            'bookings' => $bookings->toArray(),
+            'success' => session('success'),
+            'error' => session('error'),
         ]);
     }
-
     /**
      * Update the user's profile information.
      */
-    public function update(ProfileUpdateRequest $request): RedirectResponse
+    public function update(Request $request): RedirectResponse
     {
-        $request->user()->fill($request->validated());
+        $user = $request->user();
 
-        if ($request->user()->isDirty('email')) {
-            $request->user()->email_verified_at = null;
+        // Валидация для имени, email и телефона
+        $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255', \Illuminate\Validation\Rule::unique('users')->ignore($user->id)],
+            'phone' => ['nullable', 'string', 'max:20'], // Добавлено правило для телефона
+        ]);
+
+        $user->fill($request->validated());
+
+        if ($user->isDirty('email')) {
+            $user->email_verified_at = null;
         }
 
-        $request->user()->save();
+        $user->save();
 
-        return Redirect::route('profile.edit')->with('success', 'Данные профиля успешно обновлены.');
+        return Redirect::route('profile.edit')->with('success', 'Профиль успешно обновлен.');
     }
 
     /**
@@ -63,12 +64,12 @@ class ProfileController extends Controller
     public function updatePassword(Request $request): RedirectResponse
     {
         $request->validate([
-            'current_password' => ['required', 'current_password'],
-            'password' => ['required', 'confirmed', 'min:8'],
+            'current_password' => ['required', 'string', 'current_password'],
+            'password' => ['required', 'string', 'min:8', 'confirmed', \Illuminate\Validation\Rules\Password::defaults()],
         ]);
 
         $request->user()->update([
-            'password' => bcrypt($request->password),
+            'password' => \Illuminate\Support\Facades\Hash::make($request->password),
         ]);
 
         return Redirect::route('profile.edit')->with('success', 'Пароль успешно обновлен.');
@@ -80,7 +81,7 @@ class ProfileController extends Controller
     public function destroy(Request $request): RedirectResponse
     {
         $request->validate([
-            'password' => ['required', 'current_password'],
+            'password' => ['required', 'string', 'current_password'],
         ]);
 
         $user = $request->user();

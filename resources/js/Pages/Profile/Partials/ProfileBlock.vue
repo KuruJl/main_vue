@@ -1,3 +1,132 @@
+<script setup>
+import { usePage, useForm, router } from '@inertiajs/vue3';
+import { computed, ref, watch, onMounted } from 'vue';
+
+const props = defineProps({
+    bookings: {
+        type: Array,
+        default: () => []
+    },
+    success: String,
+    error: String,
+    mustVerifyEmail: Boolean,
+    status: String,
+});
+
+const page = usePage();
+const user = computed(() => page.props.auth.user);
+
+const editMode = ref(false);
+
+const form = useForm({
+    name: user.value ? user.value.name : '',
+    email: user.value ? user.value.email : '',
+    phone: user.value ? user.value.phone || '' : '',
+});
+
+const passwordForm = useForm({
+    current_password: '',
+    password: '',
+    password_confirmation: '',
+});
+
+watch(user, (newUser) => {
+    if (newUser) {
+        form.name = newUser.name;
+        form.email = newUser.email;
+        form.phone = newUser.phone || '';
+    }
+}, { immediate: true });
+
+// Добавим отслеживание props.bookings (этот код уже был, просто для напоминания)
+watch(() => props.bookings, (newBookings) => {
+    console.log('WATCHER: props.bookings changed!', newBookings);
+    console.log('WATCHER: Bookings length:', newBookings.length);
+}, { deep: true, immediate: true });
+
+onMounted(() => {
+    console.log('ProfileBlock component mounted.');
+    console.log('ONMOUNTED: Initial props.bookings:', props.bookings);
+    console.log('ONMOUNTED: Type of props.bookings:', typeof props.bookings);
+    console.log('ONMOUNTED: Is props.bookings an array:', Array.isArray(props.bookings));
+    console.log('ONMOUNTED: Length of props.bookings:', props.bookings.length);
+
+    if (props.success) {
+        alert(props.success);
+    }
+    if (props.error) {
+        alert(props.error);
+    }
+});
+
+const enterEditMode = () => {
+    editMode.value = true;
+    form.name = user.value.name;
+    form.email = user.value.email;
+    form.phone = user.value.phone || '';
+    passwordForm.reset();
+    passwordForm.clearErrors();
+};
+
+const saveChanges = () => {
+    // ИСПОЛЬЗУЕМ ПРЯМОЙ ПУТЬ /profile
+    form.patch('/profile', {
+        onSuccess: () => {
+            editMode.value = false;
+            router.reload({ only: ['auth', 'bookings', 'success', 'error'] });
+        },
+        onError: () => {
+            console.error('Ошибка при сохранении профиля:', form.errors);
+        }
+    });
+};
+
+const cancelEdit = () => {
+    editMode.value = false;
+    form.reset();
+    form.clearErrors();
+    passwordForm.reset();
+    passwordForm.clearErrors();
+};
+
+const updatePassword = () => {
+    // ИСПОЛЬЗУЕМ ПРЯМОЙ ПУТЬ /profile/password
+    passwordForm.patch('/profile/password', {
+        onSuccess: () => {
+            passwordForm.reset();
+            router.reload({ only: ['status', 'success', 'error'] });
+        },
+        onError: (errors) => {
+            console.error('Ошибка при изменении пароля:', errors);
+        },
+        onFinish: () => {
+            passwordForm.reset('current_password');
+        }
+    });
+};
+
+const formatDate = (dateString) => {
+    if (!dateString) return 'Не указано';
+    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+    return new Date(dateString).toLocaleDateString('ru-RU', options);
+};
+
+const getStatusText = (status) => {
+    switch (status) {
+        case 'pending':
+            return 'В ожидании';
+        case 'confirmed':
+            return 'Подтверждено';
+        case 'declined':
+            return 'Отклонено';
+        case 'cancelled':
+            return 'Отменено';
+        default:
+            return status;
+    }
+};
+</script>
+
 <template>
   <div class="profile-container">
       <h1 class="profile-title">ПРОФИЛЬ</h1>
@@ -84,155 +213,27 @@
 
           <h2 class="profile-subtitle mt-8">Мои Бронирования</h2>
           <div class="bookings-list">
-              <p v-if="bookings.length === 0" class="no-bookings-message">У вас пока нет активных бронирований.</p>
-              <div v-for="booking in bookings" :key="booking.id" class="booking-item">
+              <p v-if="props.bookings.length === 0" class="no-bookings-message">У вас пока нет активных бронирований.</p>
+              <div v-for="booking in props.bookings" :key="booking.id" class="booking-item">
                   <div class="booking-header">
                       <h3>{{ booking.listing ? booking.listing.title : 'Объявление удалено' }}</h3>
                       <span :class="['booking-status', `status-${booking.status}`]">
                           {{ getStatusText(booking.status) }}
                       </span>
                   </div>
-                  <p><strong>Даты:</strong> {{ formatDate(booking.start_date) }} - {{ formatDate(booking.end_date) }}</p>
+                  <p><strong>Даты:</strong> {{ formatDate(booking.start_date) }} - {{ formatDate(booking.date_end) }}</p>
                   <p><strong>Ночей:</strong> {{ booking.number_of_nights || 'Не указано' }}</p>
                   <p><strong>Итого к оплате:</strong> {{ booking.total_price }} ₽</p>
                   <p><strong>Дата бронирования:</strong> {{ formatDate(booking.created_at) }}</p>
               </div>
           </div>
-          </div>
+      </div>
   </div>
 </template>
 
-<script setup>
-import { usePage, useForm } from '@inertiajs/vue3';
-import { computed, ref, watch, onMounted } from 'vue';
-
-// Определяем пропсы, которые компонент будет принимать
-const props = defineProps({
-  // user: Object, // Эту строку закомментируем/удалим, если user берется из page.props.auth.user
-  bookings: {
-      type: Array,
-      default: () => []
-  },
-  success: String,
-  error: String,
-  mustVerifyEmail: Boolean,
-  status: String,
-});
-
-const page = usePage();
-// *** ВОТ ЭТА СТРОКА ОПРЕДЕЛЯЕТ, КАК ПОЛУЧАЮТСЯ ДАННЫЕ ПОЛЬЗОВАТЕЛЯ ***
-// Если ваш контроллер передает пользователя через page.props.auth.user (стандарт Breeze/Jetstream),
-// то используем ее.
-const user = computed(() => page.props.auth.user); 
-// Если ваш контроллер передает пользователя как отдельный пропс 'user', 
-// раскомментируйте 'user: Object' в defineProps и используйте:
-// const user = computed(() => props.user); 
-// Но для стандартной Inertia/Laravel Breeze настройки, первый вариант (page.props.auth.user) предпочтительнее.
-
-const editMode = ref(false);
-
-// Инициализируем форму с данными пользователя
-const form = useForm({
-  name: user.value ? user.value.name : '',
-  email: user.value ? user.value.email : '',
-  phone: user.value ? user.value.phone || '' : '',
-});
-
-// Форма для изменения пароля
-const passwordForm = useForm({
-  current_password: '',
-  password: '',
-  password_confirmation: '',
-});
-
-// Отслеживаем изменения в объекте user и обновляем форму
-watch(user, (newUser) => {
-  if (newUser) {
-      form.name = newUser.name;
-      form.email = newUser.email;
-      form.phone = newUser.phone || '';
-  }
-}, { immediate: true });
-
-// Хук жизненного цикла, выполняется после монтирования компонента
-onMounted(() => {
-  console.log('Profile component mounted. Bookings:', props.bookings);
-  // Отображение flash-сообщений, если они есть
-  if (props.success) {
-      alert(props.success);
-  }
-  if (props.error) {
-      alert(props.error);
-  }
-});
-
-
-const enterEditMode = () => {
-  editMode.value = true;
-  // Обновляем форму данными пользователя при входе в режим редактирования
-  form.name = user.value.name;
-  form.email = user.value.email;
-  form.phone = user.value.phone || '';
-  passwordForm.reset();
-  passwordForm.clearErrors();
-};
-
-const saveChanges = () => {
-  form.patch('/profile', {
-      onSuccess: () => {
-          editMode.value = false;
-      },
-      onError: () => {
-          console.error('Ошибка при сохранении профиля:', form.errors);
-      }
-  });
-};
-
-const cancelEdit = () => {
-  editMode.value = false;
-  form.reset();
-  form.clearErrors();
-  passwordForm.reset();
-  passwordForm.clearErrors();
-};
-
-const updatePassword = () => {
-  passwordForm.patch('/profile/password', {
-      onSuccess: () => {
-          passwordForm.reset();
-      },
-      onError: (errors) => {
-          console.error('Ошибка при изменении пароля:', errors);
-      },
-      onFinish: () => {
-          passwordForm.reset('current_password');
-      }
-  });
-};
-
-// Вспомогательная функция для форматирования даты
-const formatDate = (dateString) => {
-  if (!dateString) return 'Не указано';
-  const options = { year: 'numeric', month: 'long', day: 'numeric' };
-  return new Date(dateString).toLocaleDateString('ru-RU', options);
-};
-
-// Вспомогательная функция для отображения статуса на русском
-const getStatusText = (status) => {
-  switch (status) {
-      case 'pending':
-          return 'В ожидании';
-      case 'confirmed':
-          return 'Подтверждено';
-      case 'declined':
-          return 'Отклонено';
-      case 'cancelled':
-          return 'Отменено';
-      default:
-          return status;
-  }
-};
-</script>
+<style scoped>
+/* Ваши стили */
+</style>
 
 <style scoped>
 /* Ваши существующие стили */

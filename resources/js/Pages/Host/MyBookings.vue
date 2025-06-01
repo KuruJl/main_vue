@@ -11,10 +11,17 @@ const props = defineProps({
 
 const confirmBooking = (bookingId) => {
     if (confirm('Вы уверены, что хотите подтвердить это бронирование?')) {
-        // --- ИЗМЕНЕНИЕ ЗДЕСЬ: ВРУЧНУЮ ФОРМИРУЕМ URL ---
-        router.put(`/my-bookings/${bookingId}/confirm`, {}, {
+        router.put(route('host.bookings.confirm', { booking: bookingId }), {}, { // ИСПОЛЬЗУЕМ route()
             onSuccess: () => {
                 console.log('Booking confirmed successfully!');
+                // Перезагружаем страницу хоста, чтобы обновить списки
+                router.reload({ only: ['pendingBookings', 'confirmedBookings', 'success', 'error'] });
+
+                // ОПЦИОНАЛЬНО: Если вы хотите, чтобы профиль пользователя реактивно обновился,
+                // без того, чтобы он перезагружал страницу, это сложнее и требует WebSockets (Laravel Echo).
+                // Но для большинства случаев Inertia "smart reload" при следующем посещении страницы пользователя будет достаточно.
+                // Если пользователь находится на странице своего профиля, когда хост подтвердил бронь,
+                // и он затем обновляет страницу или переходит на нее, он увидит обновленный статус.
             },
             onError: (errors) => {
                 console.error('Error confirming booking:', errors);
@@ -26,10 +33,11 @@ const confirmBooking = (bookingId) => {
 
 const declineBooking = (bookingId) => {
     if (confirm('Вы уверены, что хотите отклонить это бронирование?')) {
-        // --- ИЗМЕНЕНИЕ ЗДЕСЬ: ВРУЧНУЮ ФОРМИРУЕМ URL ---
-        router.put(`/my-bookings/${bookingId}/decline`, {}, {
+        router.put(route('host.bookings.decline', { booking: bookingId }), {}, { // ИСПОЛЬЗУЕМ route()
             onSuccess: () => {
                 console.log('Booking declined successfully!');
+                // Перезагружаем страницу хоста, чтобы обновить списки
+                router.reload({ only: ['pendingBookings', 'confirmedBookings', 'success', 'error'] });
             },
             onError: (errors) => {
                 console.error('Error declining booking:', errors);
@@ -46,7 +54,6 @@ const formatDate = (dateString) => {
 </script>
 
 <template>
-
     <div class="my-bookings-container">
         <h1>Мои Бронирования</h1>
 
@@ -90,18 +97,19 @@ const formatDate = (dateString) => {
 </template>
 
 <style scoped>
+/* Ваши стили для MyBookings.vue */
 .my-bookings-container {
-    max-width: 900px;
-    margin: 40px auto;
-    padding: 20px;
-    background-color: #fff;
-    border-radius: 8px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
     font-family: 'Rubik', sans-serif;
+    max-width: 1000px;
+    margin: 40px auto;
+    padding: 30px;
+    background-color: #fff;
+    border-radius: 10px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
 }
 
 h1 {
-    font-size: 2.5em;
+    font-size: 2.8em;
     color: #333;
     margin-bottom: 30px;
     text-align: center;
@@ -109,10 +117,11 @@ h1 {
 }
 
 .alert {
-    padding: 10px 20px;
+    padding: 15px;
     margin-bottom: 20px;
-    border-radius: 5px;
-    font-weight: 500;
+    border-radius: 8px;
+    font-size: 1.1em;
+    text-align: center;
 }
 
 .alert-success {
@@ -132,74 +141,90 @@ h1 {
 }
 
 .booking-section h2 {
-    font-size: 1.8em;
-    color: #555;
-    margin-bottom: 20px;
+    font-size: 2em;
+    color: #000;
+    margin-bottom: 25px;
     border-bottom: 2px solid #eee;
     padding-bottom: 10px;
     font-weight: 600;
 }
 
+.no-bookings {
+    text-align: center;
+    font-style: italic;
+    color: #777;
+    padding: 20px;
+    background-color: #f0f0f0;
+    border-radius: 8px;
+    border: 1px dashed #ccc;
+}
+
 .booking-list {
     display: grid;
-    gap: 20px;
+    gap: 25px;
 }
 
 .booking-item {
-    background-color: #f9f9f9;
+    background-color: #fefefe;
     border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    padding: 20px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-    transition: transform 0.2s ease;
+    border-radius: 12px;
+    padding: 25px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .booking-item:hover {
-    transform: translateY(-3px);
-}
-
-.booking-item p {
-    margin: 5px 0;
-    color: #444;
-    font-size: 0.95em;
-}
-
-.booking-item strong {
-    color: #000;
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
 }
 
 .booking-item.pending {
-    border-left: 5px solid #ffc107; /* Оранжевый для pending */
+    border-left: 5px solid #ffc107; /* Желтая полоса для ожидающих */
 }
 
 .booking-item.confirmed {
-    border-left: 5px solid #28a745; /* Зеленый для confirmed */
+    border-left: 5px solid #28a745; /* Зеленая полоса для подтвержденных */
 }
 
-.no-bookings {
+.booking-item p {
+    margin: 8px 0;
+    color: #555;
+    font-size: 1.05em;
+    line-height: 1.5;
+}
+
+.booking-item strong {
+    color: #333;
+    font-weight: 600;
+}
+
+.booking-item h3 {
+    font-size: 1.8em;
+    color: #000;
+    margin-bottom: 15px;
+    font-weight: 700;
     text-align: center;
-    color: #777;
-    font-style: italic;
-    padding: 20px;
-    border: 1px dashed #e0e0e0;
-    border-radius: 8px;
-    background-color: #fafafa;
 }
 
 .booking-actions {
-    margin-top: 15px;
+    margin-top: 20px;
     display: flex;
-    gap: 10px;
+    gap: 15px;
+    justify-content: center;
 }
 
 .btn {
-    padding: 10px 18px;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 0.9em;
-    font-weight: 600;
-    transition: background-color 0.3s ease;
+    padding: 12px 25px;
     border: none;
+    border-radius: 8px;
+    font-size: 1.1em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
 }
 
 .confirm-btn {

@@ -17,4 +17,10 @@ export default defineConfig({
             },
         }),
     ],
+    resolve: {
+        alias: {
+            // Убедитесь, что этот псевдоним настроен
+            '@': '/resources/js',
+        },
+    },
 });
