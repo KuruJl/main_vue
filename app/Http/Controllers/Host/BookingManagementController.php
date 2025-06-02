@@ -73,7 +73,7 @@ class BookingManagementController extends Controller
             return redirect()->back()->with('error', 'Бронирование уже не находится в ожидании.');
         }
 
-        $booking->update(['status' => 'cancelled    ']); // <-- Исправлено: значение в кавычках!
+        $booking->update(['status' => 'cancelled']); // <-- Исправлено: значение в кавычках!
 
         // Здесь можно добавить логику отправки уведомления пользователю об отклонении
         // Mail::to($booking->user->email)->send(new BookingDeclined($booking));

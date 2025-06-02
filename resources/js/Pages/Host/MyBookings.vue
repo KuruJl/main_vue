@@ -11,17 +11,12 @@ const props = defineProps({
 
 const confirmBooking = (bookingId) => {
     if (confirm('Вы уверены, что хотите подтвердить это бронирование?')) {
-        router.put(route('host.bookings.confirm', { booking: bookingId }), {}, { // ИСПОЛЬЗУЕМ route()
+        // ИСПОЛЬЗУЕМ ПРЯМОЙ URL, СООТВЕТСТВУЮЩИЙ ВАШИМ МАРШРУТАМ
+        router.put(`/my-bookings/${bookingId}/confirm`, {}, {
             onSuccess: () => {
                 console.log('Booking confirmed successfully!');
                 // Перезагружаем страницу хоста, чтобы обновить списки
                 router.reload({ only: ['pendingBookings', 'confirmedBookings', 'success', 'error'] });
-
-                // ОПЦИОНАЛЬНО: Если вы хотите, чтобы профиль пользователя реактивно обновился,
-                // без того, чтобы он перезагружал страницу, это сложнее и требует WebSockets (Laravel Echo).
-                // Но для большинства случаев Inertia "smart reload" при следующем посещении страницы пользователя будет достаточно.
-                // Если пользователь находится на странице своего профиля, когда хост подтвердил бронь,
-                // и он затем обновляет страницу или переходит на нее, он увидит обновленный статус.
             },
             onError: (errors) => {
                 console.error('Error confirming booking:', errors);
@@ -33,7 +28,8 @@ const confirmBooking = (bookingId) => {
 
 const declineBooking = (bookingId) => {
     if (confirm('Вы уверены, что хотите отклонить это бронирование?')) {
-        router.put(route('host.bookings.decline', { booking: bookingId }), {}, { // ИСПОЛЬЗУЕМ route()
+        // ИСПОЛЬЗУЕМ ПРЯМОЙ URL, СООТВЕТСТВУЮЩИЙ ВАШИМ МАРШРУТАМ
+        router.put(`/my-bookings/${bookingId}/decline`, {}, {
             onSuccess: () => {
                 console.log('Booking declined successfully!');
                 // Перезагружаем страницу хоста, чтобы обновить списки

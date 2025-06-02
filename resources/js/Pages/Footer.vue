@@ -12,7 +12,7 @@
               <a href="/" class="footer-link">Главная</a>
               <a href="/search" class="footer-link">Поиск</a>
               <a href="#" class="footer-link">Контакты</a>
-              <a href="/profilee" class="footer-link">Профиль</a>
+              <a href="/profile" class="footer-link">Профиль</a>
             </nav>
           </div>
         </div>
@@ -21,8 +21,9 @@
           <div class="footer-landlord-content">
             <h3 class="footer-heading">Арендодателю</h3>
             <nav class="footer-links">
-                <a href="/profilee" class="btn">Профиль</a>
+                <a href="/profile" class="btn">Профиль</a>
                 <a href="/ad" class="footer-link">Разместить объявление</a>
+                <a href="/my-bookings" class="footer-link">Запросы на объявление</a>
             </nav>
           </div>
         </div>
