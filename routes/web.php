@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ListingController;
 use App\Http\Controllers\Host\BookingManagementController;
 use App\Http\Controllers\BookingController; // Используется для store
@@ -8,9 +9,8 @@ use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-Route::get('/', function () {
-    return Inertia::render('Home');
-});
+Route::get('/', [HomeController::class, 'index'])->name('home'); // Или просто '/' без имени
+
 
 Route::middleware(['auth'])->group(function () {
     // ЕДИНСТВЕННЫЙ И ПРАВИЛЬНЫЙ МАРШРУТ ПРОФИЛЯ
@@ -21,11 +21,14 @@ Route::middleware(['auth'])->group(function () {
 
     // Маршрут для создания бронирования (остался как был, но теперь в группе auth)
     Route::post('/bookings', [BookingController::class, 'store'])->name('bookings.store');
-
+    Route::post('/listings', [ListingController::class, 'store'])->name('listings.store'); // <-- ДОБАВЬТЕ ЭТУ СТРОКУ
     // Маршруты для управления бронированиями хостом
     Route::get('/my-bookings', [BookingManagementController::class, 'index'])->name('host.bookings.index');
     Route::put('/my-bookings/{booking}/confirm', [BookingManagementController::class, 'confirm'])->name('host.bookings.confirm');
     Route::put('/my-bookings/{booking}/decline', [BookingManagementController::class, 'decline'])->name('host.bookings.decline');
+
+    Route::get('/listings/{listing}/edit', [ListingController::class, 'edit'])->name('listings.edit');
+    Route::patch('/listings/{listing}', [ListingController::class, 'update'])->name('listings.update');
 
     // Остальные маршруты
     Route::get('/dashboard', function () {

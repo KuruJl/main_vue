@@ -4,65 +4,77 @@ namespace App\Http\Controllers;
 
 use App\Models\Listing;
 use App\Models\Booking;
+use App\Models\Image;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Auth;
+
+// **ВАЖНО:** Импортируй трейт AuthorizesRequests
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class ListingController extends Controller
 {
+    // **ВАЖНО:** Используй трейт AuthorizesRequests здесь!
+    use AuthorizesRequests; // <-- ЭТА СТРОКА!
+
+    /**
+     * Отображает список объявлений с опциями фильтрации.
+     * Используется для страницы поиска.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Inertia\Response
+     */
     public function index(Request $request)
     {
-        // 1. Получаем все уникальные города для фильтра (из всех объявлений)
+        // ... (весь твой существующий код для index) ...
         $cities = Listing::select('city')
                          ->distinct()
                          ->orderBy('city')
                          ->pluck('city')
                          ->toArray();
 
-        // 2. Получаем минимальную и максимальную цену / количество комнат для фильтра
-        $minPrice = Listing::min('price_per_night');
-        $maxPrice = Listing::max('price_per_night');
-        $minRooms = Listing::min('count_rooms');
-        $maxRooms = Listing::max('count_rooms');
+        $minPrice = Listing::min('price_per_night') ?? 0;
+        $maxPrice = Listing::max('price_per_night') ?? 0;
+        $minRooms = Listing::min('count_rooms') ?? 0;
+        $maxRooms = Listing::max('count_rooms') ?? 0;
 
-        // Начинаем запрос к объявлениям, включая изображения
         $query = Listing::with('images');
 
-        // Применяем фильтры из запроса
-        // Фильтр по городу
-        if ($request->has('city') && $request->input('city') !== null && $request->input('city') !== '') {
+        if ($request->filled('city')) {
             $query->where('city', $request->input('city'));
         }
 
-        // Фильтр по количеству комнат
-        if ($request->has('count_rooms') && $request->input('count_rooms') !== null) {
+        if ($request->filled('count_rooms')) {
             $query->where('count_rooms', (int) $request->input('count_rooms'));
         }
 
-        // Фильтр по диапазону цен
-        if ($request->has('min_price') && $request->input('min_price') !== null) {
+        if ($request->filled('min_price')) {
             $query->where('price_per_night', '>=', (float) $request->input('min_price'));
         }
-        if ($request->has('max_price') && $request->input('max_price') !== null) {
+        if ($request->filled('max_price')) {
             $query->where('price_per_night', '<=', (float) $request->input('max_price'));
         }
 
-        // Фильтр по дате (например, по дате создания объявления)
-        // Для более сложной фильтрации по доступности дат потребуется отдельная логика с таблицей бронирований
-        if ($request->has('date_from') && $request->input('date_from') !== null) {
-            $query->whereDate('created_at', '>=', $request->input('date_from'));
-        }
-        if ($request->has('date_to') && $request->input('date_to') !== null) {
-            $query->whereDate('created_at', '<=', $request->input('date_to'));
+        if ($request->filled('date_from') && $request->filled('date_to')) {
+            $dateFrom = $request->input('date_from');
+            $dateTo = $request->input('date_to');
+
+            $query->whereDoesntHave('bookings', function ($q) use ($dateFrom, $dateTo) {
+                $q->whereIn('status', ['pending', 'confirmed'])
+                  ->where(function ($query) use ($dateFrom, $dateTo) {
+                      $query->where('start_date', '<=', $dateTo)
+                            ->where('end_date', '>=', $dateFrom);
+                  });
+            });
         }
 
-        // Получаем отфильтрованные объявления
         $listings = $query->get();
 
         return Inertia::render('Search', [
             'listings' => $listings,
-            'filters' => $request->all(), // Передаем текущие примененные фильтры обратно во фронтенд
-            'filterOptions' => [ // Опции для выпадающих списков/диапазонов
+            'filters' => $request->all(),
+            'filterOptions' => [
                 'cities' => $cities,
                 'minPriceOverall' => $minPrice,
                 'maxPriceOverall' => $maxPrice,
@@ -72,23 +84,26 @@ class ListingController extends Controller
         ]);
     }
 
-    public function show($id)
+    /**
+     * Отображает страницу с деталями конкретного объявления.
+     *
+     * @param  \App\Models\Listing  $listing
+     * @return \Inertia\Response
+     */
+    public function show(Listing $listing)
     {
-        $listing = Listing::with('images')->find($id);
-        if (!$listing) {
-            abort(404);
-        }
+        // ... (весь твой существующий код для show) ...
+        $listing->load('images');
 
         $bookedDates = Booking::where('listing_id', $listing->id)
                                ->whereIn('status', ['pending', 'confirmed'])
-                               // ИСПОЛЬЗУЕМ ВАШИ НАЗВАНИЯ ПОЛЕЙ: start_date, end_date
-                               ->get(['start_date', 'end_date']); // <--- ИЗМЕНЕНО
+                               ->get(['start_date', 'end_date']);
 
         $unavailableDates = [];
         foreach ($bookedDates as $booking) {
             $unavailableDates[] = [
-                'start' => $booking->start_date, // <--- ИЗМЕНЕНО
-                'end' => $booking->end_date,     // <--- ИЗМЕНЕНО
+                'start' => $booking->start_date,
+                'end' => $booking->end_date,
             ];
         }
 
@@ -98,22 +113,28 @@ class ListingController extends Controller
         ]);
     }
 
-
+    /**
+     * Сохраняет новое объявление в хранилище.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\RedirectResponse
+     */
     public function store(Request $request)
     {
-        if (!auth()->check()) {
+        // ... (весь твой существующий код для store) ...
+        if (!Auth::check()) {
             return back()->withErrors(['auth' => 'Для создания объявления необходимо войти в систему.']);
         }
 
-        $request->merge(['user_id' => auth()->id()]);
+        $request->merge(['user_id' => Auth::id()]);
 
         $validatedData = $request->validate([
             'user_id' => 'required|exists:users,id',
             'title' => 'required|string|max:255',
             'description' => 'required|string',
             'price_per_night' => 'required|numeric|min:1',
-            'address' => 'required|string',
-            'city' => 'required|string',
+            'address' => 'required|string|max:255',
+            'city' => 'required|string|max:255',
             'count_rooms' => 'required|integer|min:1',
             'images' => 'array|max:5',
             'images.*' => 'image|mimes:jpeg,png,jpg,gif,svg|max:2048',
@@ -122,8 +143,8 @@ class ListingController extends Controller
         $listing = Listing::create($validatedData);
 
         if ($request->hasFile('images')) {
-            foreach ($request->file('images') as $image) {
-                $path = Storage::disk('public')->put('listings', $image);
+            foreach ($request->file('images') as $imageFile) {
+                $path = Storage::disk('public')->put('listings', $imageFile);
                 $listing->images()->create([
                     'url' => Storage::url($path),
                     'is_cover' => false
@@ -131,29 +152,121 @@ class ListingController extends Controller
             }
         }
 
-        session()->flash('success', 'Объявление успешно создано!');
-        return redirect()->route('listings.show', $listing->id);
+        return redirect()->route('listings.show', $listing->id)
+                         ->with('success', 'Объявление успешно создано!');
     }
 
-    public function update(Request $request, $id)
+    /**
+     * Отображает форму для редактирования указанного объявления.
+     *
+     * @param  \App\Models\Listing  $listing
+     * @return \Inertia\Response
+     */
+    public function edit(Listing $listing)
     {
-        $listing = Listing::find($id);
-        if (!$listing) {
-            return response()->json(['error' => 'Not found'], 404);
-        }
+        // 1. Авторизация: Проверяем, имеет ли текущий пользователь право редактировать это объявление.
+        $this->authorize('update', $listing);
 
-        $listing->update($request->all());
-        return response()->json($listing);
+        // 2. Загружаем все изображения, связанные с объявлением, для отображения в форме.
+        $listing->load('images');
+
+        // 3. Рендерим Vue-компонент формы редактирования, передавая ему объект объявления.
+        return Inertia::render('Edit_ad', [
+            'listing' => $listing,
+        ]);
     }
 
-    public function destroy($id)
+    /**
+     * Обновляет указанное объявление в хранилище.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \App\Models\Listing  $listing
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function update(Request $request, Listing $listing)
     {
-        $listing = Listing::find($id);
-        if (!$listing) {
-            return response()->json(['error' => 'Not found'], 404);
+        // 1. Авторизация: Проверяем, имеет ли текущий пользователь право обновлять это объявление.
+        $this->authorize('update', $listing);
+
+        // 2. Валидация входящих данных для обновления.
+        $validatedData = $request->validate([
+            'title' => 'required|string|max:255',
+            'description' => 'required|string',
+            'price_per_night' => 'required|numeric|min:1',
+            'address' => 'required|string|max:255',
+            'city' => 'required|string|max:255',
+            'count_rooms' => 'required|integer|min:1',
+            'new_images' => 'nullable|array|max:5',
+            'new_images.*' => 'image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+            'existing_image_ids_to_keep' => 'nullable|array',
+            'existing_image_ids_to_keep.*' => 'exists:images,id',
+        ]);
+
+        // 3. Обновление основных полей объявления.
+        $listing->update([
+            'title' => $validatedData['title'],
+            'description' => $validatedData['description'],
+            'price_per_night' => $validatedData['price_per_night'],
+            'address' => $validatedData['address'],
+            'city' => $validatedData['city'],
+            'count_rooms' => $validatedData['count_rooms'],
+        ]);
+
+        // 4. Логика управления изображениями:
+        $currentImageIds = $listing->images->pluck('id')->toArray();
+        $imageIdsToKeep = $validatedData['existing_image_ids_to_keep'] ?? [];
+        $imageIdsToDelete = array_diff($currentImageIds, $imageIdsToKeep);
+
+        if (!empty($imageIdsToDelete)) {
+            $imagesToDelete = $listing->images()->whereIn('id', $imageIdsToDelete)->get();
+            foreach ($imagesToDelete as $image) {
+                Storage::disk('public')->delete(str_replace('/storage/', '', $image->url));
+                $image->delete();
+            }
         }
 
+        if ($request->hasFile('new_images')) {
+            if ($listing->images()->count() + count($request->file('new_images')) > 5) {
+                return back()->withErrors(['new_images' => 'Общее количество изображений не может превышать 5.']);
+            }
+
+            foreach ($request->file('new_images') as $imageFile) {
+                $path = Storage::disk('public')->put('listings', $imageFile);
+                $listing->images()->create([
+                    'url' => Storage::url($path),
+                    'is_cover' => false
+                ]);
+            }
+        }
+
+        // 5. Перенаправление после успешного обновления.
+        // Здесь используем прямой URL, так как мы договорились не использовать Ziggy.
+        return redirect('/listings/' . $listing->id)
+                         ->with('success', 'Объявление успешно обновлено!');
+    }
+
+    /**
+     * Удаляет указанное объявление из хранилища.
+     *
+     * @param  \App\Models\Listing  $listing
+     * @return \Illuminate\Http\RedirectResponse|\Illuminate\Http\JsonResponse
+     */
+    public function destroy(Listing $listing)
+    {
+        // 1. Авторизация: Проверяем, имеет ли текущий пользователь право удалять это объявление.
+        $this->authorize('delete', $listing);
+
+        // 2. Удаляем все связанные изображения с диска и из базы данных.
+        foreach ($listing->images as $image) {
+            Storage::disk('public')->delete(str_replace('/storage/', '', $image->url));
+            $image->delete();
+        }
+
+        // 3. Удаляем само объявление.
         $listing->delete();
-        return response()->json(['message' => 'Deleted']);
+
+        // 4. Перенаправление после успешного удаления.
+        // Здесь также используем прямой URL.
+        return redirect('/')->with('success', 'Объявление успешно удалено.');
     }
 }

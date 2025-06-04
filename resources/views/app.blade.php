@@ -4,7 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Sweet Home</title>
-    
     @vite(['resources/js/app.js'])
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
