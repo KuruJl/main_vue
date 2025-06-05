@@ -11,7 +11,6 @@
             <nav class="footer-links">
               <a href="/" class="footer-link">Главная</a>
               <a href="/search" class="footer-link">Поиск</a>
-              <a href="#" class="footer-link">Контакты</a>
               <a href="/profile" class="footer-link">Профиль</a>
             </nav>
           </div>

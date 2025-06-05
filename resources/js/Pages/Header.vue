@@ -4,7 +4,6 @@
       <h1 class="logo">Sweet<br />Home</h1>
       <a href="/" class="nav-link">Главная</a>
       <a href="/search" class="nav-link">Поиск</a>
-      <a href="/contacts" class="nav-link">Контакты</a>
       <a href="/profile" class="nav-link">Профиль</a>
 
     </div>

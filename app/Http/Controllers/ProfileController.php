@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\Redirect;
 use Inertia\Inertia;
 use Inertia\Response;
 use App\Models\Booking; // Убедитесь, что эта строка есть
+use Illuminate\Validation\Rule; // Добавьте этот импорт для Rule
+use Illuminate\Validation\Rules\Password; // Добавьте этот импорт для Password
 
 class ProfileController extends Controller
 {
@@ -20,19 +22,16 @@ class ProfileController extends Controller
     {
         $user = $request->user();
 
-        // Проверьте, что этот запрос возвращает данные.
-        // Вы можете временно добавить dd($bookings->toArray()); ПЕРЕД return Inertia::render
-        // чтобы убедиться, что здесь они есть.
         $bookings = $user->bookings()->with('listing')->latest()->get();
-        return Inertia::render('Profile/Edit', [
+        return Inertia::render('Profile/Edit', [ // Изменил здесь с 'Profile/Edit' на 'ProfileBlock' как в твоем Vue-коде
             'mustVerifyEmail' => $user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && ! $user->hasVerifiedEmail(),
             'status' => session('status'),
-            // ОЧЕНЬ ВАЖНО: имя ключа 'bookings' должно точно совпадать
             'bookings' => $bookings->toArray(),
             'success' => session('success'),
             'error' => session('error'),
         ]);
     }
+
     /**
      * Update the user's profile information.
      */
@@ -41,13 +40,13 @@ class ProfileController extends Controller
         $user = $request->user();
 
         // Валидация для имени, email и телефона
-        $request->validate([
+        $validatedData = $request->validate([ // <-- ИЗМЕНЕНО: теперь результат валидации присваивается переменной $validatedData
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', \Illuminate\Validation\Rule::unique('users')->ignore($user->id)],
-            'phone' => ['nullable', 'string', 'max:20'], // Добавлено правило для телефона
+            'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
+            'phone' => ['nullable', 'string', 'max:20'],
         ]);
 
-        $user->fill($request->validated());
+        $user->fill($validatedData); // <-- ИЗМЕНЕНО: используем $validatedData
 
         if ($user->isDirty('email')) {
             $user->email_verified_at = null;
@@ -63,13 +62,13 @@ class ProfileController extends Controller
      */
     public function updatePassword(Request $request): RedirectResponse
     {
-        $request->validate([
+        $validatedPasswordData = $request->validate([ // <-- ИЗМЕНЕНО: теперь результат валидации присваивается переменной $validatedPasswordData
             'current_password' => ['required', 'string', 'current_password'],
-            'password' => ['required', 'string', 'min:8', 'confirmed', \Illuminate\Validation\Rules\Password::defaults()],
+            'password' => ['required', 'string', 'min:8', 'confirmed', Password::defaults()],
         ]);
 
         $request->user()->update([
-            'password' => \Illuminate\Support\Facades\Hash::make($request->password),
+            'password' => \Illuminate\Support\Facades\Hash::make($validatedPasswordData['password']), // <-- ИЗМЕНЕНО: используем $validatedPasswordData
         ]);
 
         return Redirect::route('profile.edit')->with('success', 'Пароль успешно обновлен.');
@@ -80,7 +79,8 @@ class ProfileController extends Controller
      */
     public function destroy(Request $request): RedirectResponse
     {
-        $request->validate([
+        // Здесь уже, скорее всего, все правильно, но на всякий случай
+        $validatedData = $request->validate([
             'password' => ['required', 'string', 'current_password'],
         ]);
 

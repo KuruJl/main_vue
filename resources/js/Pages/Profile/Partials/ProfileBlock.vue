@@ -175,7 +175,7 @@ const getStatusText = (status) => {
                   </div>
 
                   <div class="info-row">
-                      <span class="info-label">Новый пароль:</span>
+                      <span class="info-label">Новый паролвфаваь:</span>
                       <input
                           type="password"
                           id="new_password"

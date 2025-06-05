@@ -156,7 +156,7 @@ const getStatusText = (status) => {
               </div>
 
               <div class="info-row">
-                  <span class="info-label">Логин:</span>
+                  <span class="info-label">Пароль:</span>
                   <span class="info-value password-mask">• • • • • • • • • •</span>
               </div>
 
