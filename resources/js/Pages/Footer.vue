@@ -23,7 +23,7 @@
                 <a href="/profile" class="btn">Профиль</a>
                 <a href="/ad" class="footer-link">Разместить объявление</a>
                 <a href="/my-bookings" class="footer-link">Запросы на объявление</a>
-                <a href="/my-listings" class="footer-link">Мои обновления</a>
+                <a href="/my-listings" class="footer-link">Мои объявления</a>
             </nav>
           </div>
         </div>
