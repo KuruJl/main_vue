@@ -9,14 +9,19 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
-
-// **ВАЖНО:** Импортируй трейт AuthorizesRequests
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Redirect;
 
 class ListingController extends Controller
 {
-    // **ВАЖНО:** Используй трейт AuthorizesRequests здесь!
-    use AuthorizesRequests; // <-- ЭТА СТРОКА!
+    use AuthorizesRequests;
+
+    public function __construct()
+    {
+        // Применяем middleware 'auth' ко всем методам,
+        // кроме тех, что доступны неавторизованным пользователям (index, show)
+        $this->middleware('auth')->except(['index', 'show']);
+    }
 
     /**
      * Отображает список объявлений с опциями фильтрации.
@@ -27,19 +32,19 @@ class ListingController extends Controller
      */
     public function index(Request $request)
     {
-        // ... (весь твой существующий код для index) ...
         $cities = Listing::select('city')
-                         ->distinct()
-                         ->orderBy('city')
-                         ->pluck('city')
-                         ->toArray();
+                          ->distinct()
+                          ->orderBy('city')
+                          ->pluck('city')
+                          ->toArray();
 
         $minPrice = Listing::min('price_per_night') ?? 0;
         $maxPrice = Listing::max('price_per_night') ?? 0;
         $minRooms = Listing::min('count_rooms') ?? 0;
         $maxRooms = Listing::max('count_rooms') ?? 0;
 
-        $query = Listing::with('images');
+        // **ВАЖНО: Показываем только активные объявления для общего поиска**
+        $query = Listing::with('images')->where('is_active', true);
 
         if ($request->filled('city')) {
             $query->where('city', $request->input('city'));
@@ -92,7 +97,8 @@ class ListingController extends Controller
      */
     public function show(Listing $listing)
     {
-        // ... (весь твой существующий код для show) ...
+        // Здесь можно добавить проверку, если объявление неактивно и пользователь не его владелец,
+        // то перенаправлять или показывать 404. Но по умолчанию оно будет показано.
         $listing->load('images');
 
         $bookedDates = Booking::where('listing_id', $listing->id)
@@ -121,11 +127,7 @@ class ListingController extends Controller
      */
     public function store(Request $request)
     {
-        // ... (весь твой существующий код для store) ...
-        if (!Auth::check()) {
-            return back()->withErrors(['auth' => 'Для создания объявления необходимо войти в систему.']);
-        }
-
+        // Auth middleware уже применен к этому методу через конструктор
         $request->merge(['user_id' => Auth::id()]);
 
         $validatedData = $request->validate([
@@ -164,13 +166,9 @@ class ListingController extends Controller
      */
     public function edit(Listing $listing)
     {
-        // 1. Авторизация: Проверяем, имеет ли текущий пользователь право редактировать это объявление.
         $this->authorize('update', $listing);
-
-        // 2. Загружаем все изображения, связанные с объявлением, для отображения в форме.
         $listing->load('images');
 
-        // 3. Рендерим Vue-компонент формы редактирования, передавая ему объект объявления.
         return Inertia::render('Edit_ad', [
             'listing' => $listing,
         ]);
@@ -185,10 +183,8 @@ class ListingController extends Controller
      */
     public function update(Request $request, Listing $listing)
     {
-        // 1. Авторизация: Проверяем, имеет ли текущий пользователь право обновлять это объявление.
         $this->authorize('update', $listing);
 
-        // 2. Валидация входящих данных для обновления.
         $validatedData = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'required|string',
@@ -202,7 +198,6 @@ class ListingController extends Controller
             'existing_image_ids_to_keep.*' => 'exists:images,id',
         ]);
 
-        // 3. Обновление основных полей объявления.
         $listing->update([
             'title' => $validatedData['title'],
             'description' => $validatedData['description'],
@@ -210,9 +205,9 @@ class ListingController extends Controller
             'address' => $validatedData['address'],
             'city' => $validatedData['city'],
             'count_rooms' => $validatedData['count_rooms'],
+            // is_active не обновляем через этот метод, для него отдельный toggle
         ]);
 
-        // 4. Логика управления изображениями:
         $currentImageIds = $listing->images->pluck('id')->toArray();
         $imageIdsToKeep = $validatedData['existing_image_ids_to_keep'] ?? [];
         $imageIdsToDelete = array_diff($currentImageIds, $imageIdsToKeep);
@@ -239,10 +234,26 @@ class ListingController extends Controller
             }
         }
 
-        // 5. Перенаправление после успешного обновления.
-        // Здесь используем прямой URL, так как мы договорились не использовать Ziggy.
         return redirect('/listings/' . $listing->id)
-                         ->with('success', 'Объявление успешно обновлено!');
+                        ->with('success', 'Объявление успешно обновлено!');
+    }
+
+    /**
+     * Переключает статус активности объявления (is_active).
+     *
+     * @param  \App\Models\Listing  $listing
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function toggleActiveStatus(Listing $listing)
+    {
+        $this->authorize('update', $listing);
+
+        $listing->is_active = !$listing->is_active;
+        $listing->save();
+
+        $statusMessage = $listing->is_active ? 'Объявление снова активно.' : 'Объявление скрыто из доступа.';
+
+        return redirect('/my-listings')->with('success', 'Объявление успешно удалено.');
     }
 
     /**
@@ -253,20 +264,31 @@ class ListingController extends Controller
      */
     public function destroy(Listing $listing)
     {
-        // 1. Авторизация: Проверяем, имеет ли текущий пользователь право удалять это объявление.
         $this->authorize('delete', $listing);
 
-        // 2. Удаляем все связанные изображения с диска и из базы данных.
         foreach ($listing->images as $image) {
             Storage::disk('public')->delete(str_replace('/storage/', '', $image->url));
             $image->delete();
         }
 
-        // 3. Удаляем само объявление.
         $listing->delete();
 
-        // 4. Перенаправление после успешного удаления.
-        // Здесь также используем прямой URL.
-        return redirect('/')->with('success', 'Объявление успешно удалено.');
+        // ИЗМЕНЕНО: Перенаправление на страницу "Мои объявления"
+        return redirect('/my-listings')->with('success', 'Объявление успешно удалено.');
+    }
+
+    /**
+     * Отображает список всех объявлений текущего пользователя (активных и неактивных).
+     *
+     * @return \Inertia\Response
+     */
+    public function myListings()
+    {
+        // Auth middleware уже применен к этому методу
+        $listings = Auth::user()->listings()->with('images')->get();
+
+        return Inertia::render('MyListings', [
+            'listings' => $listings,
+        ]);
     }
 }

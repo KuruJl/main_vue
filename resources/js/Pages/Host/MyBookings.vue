@@ -7,17 +7,15 @@ import AppFooter from '../../Pages/Footer.vue';
 const props = defineProps({
     pendingBookings: Array,
     confirmedBookings: Array,
-    success: String, // Для flash-сообщений Laravel
-    error: String,   // Для flash-сообщений Laravel
+    success: String,
+    error: String,
 });
 
 const confirmBooking = (bookingId) => {
     if (confirm('Вы уверены, что хотите подтвердить это бронирование?')) {
-        // ИСПОЛЬЗУЕМ ПРЯМОЙ URL, СООТВЕТСТВУЮЩИЙ ВАШИМ МАРШРУТАМ
         router.put(`/my-bookings/${bookingId}/confirm`, {}, {
             onSuccess: () => {
                 console.log('Booking confirmed successfully!');
-                // Перезагружаем страницу хоста, чтобы обновить списки
                 router.reload({ only: ['pendingBookings', 'confirmedBookings', 'success', 'error'] });
             },
             onError: (errors) => {
@@ -30,17 +28,29 @@ const confirmBooking = (bookingId) => {
 
 const declineBooking = (bookingId) => {
     if (confirm('Вы уверены, что хотите отклонить это бронирование?')) {
-        // ИСПОЛЬЗУЕМ ПРЯМОЙ URL, СООТВЕТСТВУЮЩИЙ ВАШИМ МАРШРУТАМ
         router.put(`/my-bookings/${bookingId}/decline`, {}, {
             onSuccess: () => {
                 console.log('Booking declined successfully!');
-                // Перезагружаем страницу хоста, чтобы обновить списки
                 router.reload({ only: ['pendingBookings', 'confirmedBookings', 'success', 'error'] });
             },
             onError: (errors) => {
                 console.error('Error declining booking:', errors);
                 alert('Ошибка при отклонении бронирования: ' + (errors.message || JSON.stringify(errors) || 'Неизвестная ошибка'));
             }
+        });
+    }
+};
+
+const deleteListing = (listingId) => {
+    if (confirm('Вы уверены, что хотите удалить это объявление?')) {
+        router.delete(`/listings/${listingId}`, {
+            onSuccess: () => {
+                router.reload({ only: ['pendingBookings', 'confirmedBookings', 'success', 'error'] });
+            },
+            onError: (errors) => {
+                console.error('Error deleting listing:', errors);
+                alert('Ошибка при удалении объявления: ' + (errors.message || JSON.stringify(errors) || 'Неизвестная ошибка'));
+            },
         });
     }
 };
@@ -52,7 +62,7 @@ const formatDate = (dateString) => {
 </script>
 
 <template>
-    <AppHeader /> 
+    <AppHeader />
 
     <div class="my-bookings-container">
         <h1>Мои Бронирования</h1>
@@ -89,13 +99,13 @@ const formatDate = (dateString) => {
                     <p><strong>Ночей:</strong> {{ booking.number_of_nights || 'N/A' }}</p>
                     <p><strong>Итого:</strong> {{ booking.total_price }} ₽</p>
                     <p><strong>Статус:</strong> {{ booking.status }}</p>
+                     <button @click="deleteListing(booking.listing.id)" class="btn delete-btn">Удалить объявление</button>
                 </div>
             </div>
             <p v-else class="no-bookings">Нет подтвержденных бронирований.</p>
         </section>
     </div>
     <AppFooter />
-
 </template>
 
 <style scoped>
@@ -244,6 +254,20 @@ h1 {
 }
 
 .decline-btn:hover {
+    background-color: #c82333;
+}
+.delete-btn {
+    background-color: #dc3545;
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    margin-top: 10px;
+}
+
+.delete-btn:hover {
     background-color: #c82333;
 }
 </style>
