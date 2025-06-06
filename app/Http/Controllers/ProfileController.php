@@ -9,9 +9,10 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
 use Inertia\Inertia;
 use Inertia\Response;
-use App\Models\Booking; // Убедитесь, что эта строка есть
-use Illuminate\Validation\Rule; // Добавьте этот импорт для Rule
-use Illuminate\Validation\Rules\Password; // Добавьте этот импорт для Password
+use App\Models\Booking;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
+use Illuminate\Support\Facades\Hash; // Добавьте этот импорт для Hash
 
 class ProfileController extends Controller
 {
@@ -23,55 +24,59 @@ class ProfileController extends Controller
         $user = $request->user();
 
         $bookings = $user->bookings()->with('listing')->latest()->get();
-        return Inertia::render('Profile/Edit', [ // Изменил здесь с 'Profile/Edit' на 'ProfileBlock' как в твоем Vue-коде
+        return Inertia::render('Profile/Edit', [ // ИЛИ 'ProfileBlock' если вы переименовали Edit.vue в ProfileBlock.vue
             'mustVerifyEmail' => $user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail && ! $user->hasVerifiedEmail(),
             'status' => session('status'),
             'bookings' => $bookings->toArray(),
             'success' => session('success'),
             'error' => session('error'),
+            // Передаем текущий телефон, чтобы Vue мог его отобразить
+            'userPhone' => $user->phone, // <-- Добавлено
         ]);
     }
 
     /**
-     * Update the user's profile information.
+     * Update the user's profile information and optionally password.
      */
     public function update(Request $request): RedirectResponse
     {
         $user = $request->user();
 
-        // Валидация для имени, email и телефона
-        $validatedData = $request->validate([ // <-- ИЗМЕНЕНО: теперь результат валидации присваивается переменной $validatedData
+        // 1. Валидация для имени, email и телефона
+        $rules = [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
             'phone' => ['nullable', 'string', 'max:20'],
-        ]);
+        ];
 
-        $user->fill($validatedData); // <-- ИЗМЕНЕНО: используем $validatedData
+        // 2. Условная валидация для пароля
+        // Если любое из полей пароля заполнено, тогда требуем все поля пароля и валидируем их
+        if ($request->filled('current_password') || $request->filled('password') || $request->filled('password_confirmation')) {
+            $rules['current_password'] = ['required', 'string', 'current_password'];
+            $rules['password'] = ['required', 'string', 'min:8', 'confirmed', Password::defaults()];
+        }
+
+        $validatedData = $request->validate($rules);
+
+        // Обновление основной информации пользователя
+        $user->fill([
+            'name' => $validatedData['name'],
+            'email' => $validatedData['email'],
+            'phone' => $validatedData['phone'], // 'phone' всегда будет в $validatedData из-за nullable
+        ]);
 
         if ($user->isDirty('email')) {
             $user->email_verified_at = null;
         }
 
+        // Обновление пароля, если поля были заполнены
+        if (isset($validatedData['password'])) {
+            $user->password = Hash::make($validatedData['password']);
+        }
+
         $user->save();
 
-        return Redirect::route('profile.edit')->with('success', 'Профиль успешно обновлен.');
-    }
-
-    /**
-     * Update the user's password.
-     */
-    public function updatePassword(Request $request): RedirectResponse
-    {
-        $validatedPasswordData = $request->validate([ // <-- ИЗМЕНЕНО: теперь результат валидации присваивается переменной $validatedPasswordData
-            'current_password' => ['required', 'string', 'current_password'],
-            'password' => ['required', 'string', 'min:8', 'confirmed', Password::defaults()],
-        ]);
-
-        $request->user()->update([
-            'password' => \Illuminate\Support\Facades\Hash::make($validatedPasswordData['password']), // <-- ИЗМЕНЕНО: используем $validatedPasswordData
-        ]);
-
-        return Redirect::route('profile.edit')->with('success', 'Пароль успешно обновлен.');
+        return Redirect::route('profile.edit')->with('success', 'Профиль и/или пароль успешно обновлены.');
     }
 
     /**
@@ -79,7 +84,6 @@ class ProfileController extends Controller
      */
     public function destroy(Request $request): RedirectResponse
     {
-        // Здесь уже, скорее всего, все правильно, но на всякий случай
         $validatedData = $request->validate([
             'password' => ['required', 'string', 'current_password'],
         ]);

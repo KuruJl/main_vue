@@ -1,10 +1,10 @@
 <template>
   <div>
-    <Header /> 
+    <AppHeader /> 
 
     <CreateAd :user-id="currentUserId" />
 
-    <Footer />
+    <AppFooter />
   </div>
 </template>
 

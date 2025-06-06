@@ -36,6 +36,7 @@ class HandleInertiaRequests extends Middleware
                     'id' => $request->user()->id,
                     'name' => $request->user()->name,
                     'email' => $request->user()->email,
+                    'phone' => $request->user()->phone,
                     // Добавьте другие поля пользователя, если нужно
                 ] : null,
             ],
@@ -48,11 +49,7 @@ class HandleInertiaRequests extends Middleware
             ],
             // ***************************************************************
 
-            // Удаленный или закомментированный блок Ziggy, если он не используется:
-            // 'ziggy' => fn () => [
-            //     ...(new Ziggy)->toArray(),
-            //     'location' => $request->url(),
-            // ],
+           
         ]);
     }
 }

@@ -1,6 +1,8 @@
 <script setup>
 import { defineProps } from 'vue';
 import { router } from '@inertiajs/vue3';
+import AppHeader from '../../Pages/Header.vue';
+import AppFooter from '../../Pages/Footer.vue';
 
 const props = defineProps({
     pendingBookings: Array,
@@ -50,6 +52,8 @@ const formatDate = (dateString) => {
 </script>
 
 <template>
+    <AppHeader /> 
+
     <div class="my-bookings-container">
         <h1>Мои Бронирования</h1>
 
@@ -90,6 +94,8 @@ const formatDate = (dateString) => {
             <p v-else class="no-bookings">Нет подтвержденных бронирований.</p>
         </section>
     </div>
+    <AppFooter />
+
 </template>
 
 <style scoped>

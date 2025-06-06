@@ -5,7 +5,7 @@
       <a :href="`/listings/${listing.id}`" class="booking-title">
     {{ listing.title }}
 </a>
- <p class="booking-description">{{ listing.count_rooms }} {{ roomDeclension(listing.count_rooms) }}</p>
+<p class="booking-description">{{ listing.count_rooms }} {{ roomDeclension(listing.count_rooms) }}</p>
       <p class="booking-description">{{ listing.address }}, {{ listing.city }}</p>
     </div>
     <div class="divider" ></div>
@@ -17,9 +17,7 @@
     </a>
     </div>
   </div>
-  <div v-if="listings.length === 0">
-    <p>Помещений не найдено.</p>
-  </div>
+  <div v-if="listings.length === 0" class="no-listings-message-container"> <p class="no-listings-message">Помещений не найдено.</p> </div>
 </template>
 
 <script>
@@ -42,6 +40,25 @@ export default {
 }
 </script>
 <style scoped>
+.no-listings-message-container {
+    /* Чтобы центрировать сам блок */
+    width: 920px; /* Задаем ту же ширину, что и у booking-block */
+    margin: 20px auto; /* Центрируем контейнер */
+    text-align: center; /* Центрируем текст внутри контейнера */
+    padding: 40px 20px; /* Добавим немного отступа сверху/снизу и по бокам */
+    background-color: #f0f0f0; /* Легкий фон, чтобы выделить */
+    border-radius: 10px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.no-listings-message {
+    font-family: 'Rubik'; /* Применяем ваш шрифт */
+    font-size: 24px; /* Увеличим размер для наглядности */
+    color: #555; /* Более мягкий цвет */
+    margin: 0; /* Убираем стандартные отступы параграфа */
+    font-weight: 500;
+}
+
 /* Ваши существующие стили остаются без изменений */
 .booking-price {
   display: flex;
@@ -80,11 +97,8 @@ export default {
   padding-left: 10px;
   box-sizing: border-box;
 
-  /* ДОБАВЛЕНО/ИЗМЕНЕНО: */
-  /* Распределяем пространство между элементами */
-  justify-content: space-between; 
-  /* Добавляем небольшой внутренний отступ справа, чтобы контент не прилипал к краю */
-  padding-right: 20px; /* или столько, сколько нужно */
+  justify-content: space-between;
+  padding-right: 20px;
 }
 
 .booking-image {

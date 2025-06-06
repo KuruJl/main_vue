@@ -150,7 +150,7 @@ const getStatusText = (status) => {
 
               <div class="info-row">
                   <span class="info-label">Номер телефона:</span>
-                  <span v-if="!editMode" class="info-value">{{ user ? user.phone || 'Не указан' : 'Недоступно' }}</span>
+                  <span v-if="!editMode" class="info-value">{{ user ? user.phone || 'Не укаыаываызан' : 'Недоступно' }}</span>
                   <input v-else type="text" v-model="form.phone" class="edit-input" />
                   <span v-if="form.errors.phone" class="error-message">{{ form.errors.phone }}</span>
               </div>

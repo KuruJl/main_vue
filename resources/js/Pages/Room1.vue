@@ -209,50 +209,53 @@ const proceedToBooking = () => {
 <style scoped>
 /* Ваши существующие стили */
 .hotel-block {
-  font-family: 'Rubik';
-  margin: 20px auto;
-  width: 1120px;
-  height: auto;
-  display: flex;
-  background-color: #fff;
-  border-radius: 10px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    font-family: 'Rubik';
+    margin: 20px auto;
+    width: 1120px; /* Общая ширина блока отеля, если вы хотите, чтобы она изменилась */
+    height: auto;
+    display: flex;
+    background-color: #fff;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
 }
 
 .hotel-images {
-  width: 533px;
-  height: auto;
-  display: flex;
-  flex-direction: column;
+    /* ИЗМЕНЕНО: Увеличиваем ширину, чтобы вместить 4 миниатюры + отступы */
+    width: 560px; /* Было 533px. Расчет: 4*124 + 3*10 + 2*10 = 546px. Берем с небольшим запасом. */
+    height: auto;
+    display: flex;
+    flex-direction: column;
 }
 
 .main-image {
-  border-radius: 5px;
-  width: 100%;
-  height: 400px;
-  overflow: hidden;
+    border-radius: 5px;
+    width: 100%; /* Остается 100% от новой ширины hotel-images */
+    height: 400px; /* Можно увеличить, если хотите, чтобы главная картинка была выше */
+    overflow: hidden;
 }
 
 .main-image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .thumbnails {
-  display: flex;
-  gap: 10px;
-  padding: 10px;
-  background-color: #f5f5f5;
-  flex-wrap: wrap;
+    display: flex;
+    gap: 10px;
+    padding: 10px;
+    background-color: #f5f5f5;
+    flex-wrap: wrap;
+    /* Если хотите, можете добавить justify-content: space-between; или center; */
+    /* justify-content: flex-start; по умолчанию */
 }
 
 .thumbnail {
-  width: 124px;
-  height: 58px;
-  overflow: hidden;
-  cursor: pointer;
-  border-radius: 3px;
+    width: 124px; /* Сохраняем ширину миниатюры */
+    height: 58px;
+    overflow: hidden;
+    cursor: pointer;
+    border-radius: 3px;
 }
 
 .thumbnail img {
